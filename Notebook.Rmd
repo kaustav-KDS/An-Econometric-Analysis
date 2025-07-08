@@ -1,0 +1,696 @@
+---
+title: "The Effects on Dropout Rates of Secondary School Girls 
+in Indian States: An Econometric Analysis"
+output: 
+    rmdformats::readthedown:
+    self_contained: FALSE
+    thumbnails: True
+    lightbox: True
+    gallery: True
+    highlight: tango
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(eco= TRUE, comment = "", collapse = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r klippy, include=TRUE, echo=FALSE}
+klippy::klippy()
+```
+
+# Problem Statement
+
+Despite notable strides in elementary education, the dropout rate among secondary‐school girls in India remains alarmingly high, undermining both gender equity and the nation’s broader development goals. Persistent attrition at this stage not only curtails young women’s lifetime earnings and health outcomes but also perpetuates cycles of poverty and social disadvantage. While previous studies have highlighted individual factors - such as household income, parental education, and school infrastructure - few have brought these elements together within a unified econometric framework at the state level.
+
+This study therefore addresses the following core question:
+
+-   *"What socio‐demographic and infrastructural factors most strongly predict secondary‐school dropout rates among girls across Indian states?"*
+
+By employing a panel of state‐level indicators - this paper seeks to quantify the relative importance of each determinant and thus inform targeted, evidence‐based policy responses.
+
+# Data Set
+
+## Description of variables and Data Sources
+
+```{r}
+library(tibble)
+library(knitr)
+
+my_table <- tribble(
+  ~Category, ~Variable_Name, ~Description, ~Source,
+  "Dependent Variable", "Dropout", "Percentage of girls who leave school before completing secondary education", "Unified District Information System for Education (data.gov.in)",
+  "Enrolment Rates for Girls", "Enroll", "Percentage of girls enrolled in primary schools", "Unified District Information System for Education (data.gov.in)",
+  "School Infrastructure", "Toilet", "Percentage of schools with functional girls' washrooms", "Unified District Information System for Education (data.gov.in)",
+  "Social & Economic Indicators", "Crime_Rate", "Crimes against women per 100,000 female population", "NCRB Report, 2014",
+  "Social & Economic Indicators", "Child_Marriage", "Percentage of girls married before the age of 18 in each state", "National Family Health Survey (NFHS‑4, 2015–16)",
+  "Social & Economic Indicators", "Sex_Ratio", "Number of females per 1,000 males in each state", "Rajya Sabha Session - 253, Unstarred Question No. 459; MoH&FW (via HMIS data)",
+  "Social & Economic Indicators", "NSDP", "Net State Domestic Product per capita (INR)", "NSO, MoSPI",
+  "Social & Economic Indicators", "Literacy_Rate_Female", "% of women aged seven and above, who can both read and write with understanding in any language", "Census 2011 & Telangana portal"
+)
+
+```
+
+```{r}
+kable(my_table, align = "lccc")
+```
+
+## Sample Size
+
+All data were collected for the period 2014-15. Except for "*Literacy_Rate_Female*", which is collected from the 2011 census.
+
+-   **Initial Observations:** 37 (States/UTs including "*All India*").
+
+-   **Excluded Due to Missing Values:**
+
+    -   Chandigarh
+
+    -   Dadra & Nagar Haveli
+
+    -   Daman & Diu
+
+    -   Lakshadweep
+
+-   **Final Observations:** 33
+
+**Nature of unavailability of data**
+
+Chandigarh did not have data on Dropout Rate (Dependent variable)
+
+Others did not have data on Child Marriage during 2014-15
+
+## Descriptive Statistics for relevant variables
+
+```{r}
+data <- read.csv("Final_Data.csv")
+data$X <- NULL
+#colnames(data)[which(names(data) == "Primary_Girls_ENROLL")] <- "Enroll"
+data$State_UT <- factor(data$State_UT)
+summary(data)
+```
+
+### Scatter Plot Matrix
+
+```{r}
+library(GGally)
+df <- data
+df$State_UT<-NULL
+ggpairs(df, progress = FALSE)
+```
+
+# Data Exploration
+
+## 1. Box Plots
+
+A box plot is a graphical tool that represents the distribution of a dataset through its quartiles. The box, spanning Q1 to Q3, encloses the central 50% of observations; a line inside the box denotes the median. Whiskers extend to the most extreme data points within 1.5 times the IQR, and any points beyond these fences are individually plotted as outliers
+
+```{r}
+# Defineing the Boxplot function
+
+boxplot_with_outliers_base <- function(data, value_col, id_col, title = "Boxplot with Labeled Outliers") {
+  # Generate boxplot and extract outliers
+  bp <- boxplot(data[[value_col]], plot = FALSE)
+  outliers <- bp$out
+  outlier_indices <- which(data[[value_col]] %in% outliers)
+  lab <- data[[id_col]][outlier_indices]
+  
+  if (length(bp$out) == 0){
+    
+    boxplot(data[[value_col]], main = title)
+
+  }else{
+  # Plot boxplot and add labels
+  boxplot(data[[value_col]], main = title)
+  text(
+    x = 1, 
+    y = outliers, 
+    labels = lab, 
+    pos = 4,   # Position labels to the right
+    cex = 0.7, # Adjust text size
+    col = "red"
+  )
+  }
+}
+```
+
+#### 1. Dropout Rate of Girls in Secondary Schools [*Dependent Variable*]
+
+```{r}
+boxplot_with_outliers_base(data, "Dropout", "State_UT", "Dropout Rate of Secondary Girls")
+```
+
+These is no obvious outlier in the *dependent variable*. Data seems evenly distributed.
+
+#### 2. Enrollment Rate of girls in Primary Schools
+
+```{r}
+boxplot_with_outliers_base(data, "Enroll", "State_UT", "Enrollment Rate of Primary Girls")
+```
+
+The enrolment of primary girls has a few outliers: *“**Meghalaya**”*, “***Manipur**”, “**Arunachal Pradesh**”*. All the outliers belong to the North East region (they have higher enrolment rate than the rest of the states).
+
+#### 3. Availability of Girls' Washrooms in Schools
+
+```{r}
+boxplot_with_outliers_base(data, "Toilet", "State_UT","Availability of Girls' Washrooms in Schools") 
+```
+
+Negatively skewed distribution. There are fore outliers in this variable: *“**Jammu & Kashmir**”, “**Bihar**”, “**Assam**” and “**Meghalaya**”*. Among them *“**Meghalaya**”* stand significantly low (63.92%).
+
+#### 4. Crime Rate against Women
+
+```{r}
+boxplot_with_outliers_base(data, "Crime_Rate", "State_UT", "Rate of Crime against Women")
+```
+
+The boxplot reveals two notable observations: "***Delhi***" and "***Assam***" have a higher crime rate per capita, with "***Delhi***" standing out as significantly above "***Assam***"
+
+#### 5. Child Marriage Rate
+
+```{r}
+boxplot_with_outliers_base(data, "Child_Marriage", "State_UT", "Rate of Child Marriage")
+```
+
+No obvious outlier could be detected.
+
+#### 6. Sex Ratio
+
+```{r}
+boxplot_with_outliers_base(data, "Sex_Ratio", "State_UT","Sex Ratio in States")
+```
+
+The Boxplot of the *Sex Ratio* variable identifies one outlier: “***Haryana***”, it has significantly lower sex ratio than the rest of the states
+
+#### 7. Net State Domestic Product Per Capita (Current Prices)
+
+```{r}
+boxplot_with_outliers_base(data, "NSDP", "State_UT","Net State Domestic Product Per Capita (Current Prices)")
+```
+
+There are two outliers in this data that can be identified using the boxplot. “***Goa***” and “***Delhi***” have per capita income way above the rest of the states and “All India”.
+
+#### 8. Female Literacy Rate
+
+```{r}
+boxplot_with_outliers_base(data, "Literacy_Rate_Female", "State_UT", "Female Literacy Rate")
+```
+
+No obvious outlier could be detected. Data seems evenly distributed.
+
+## 2. Checking Linearity
+
+To check for linearity we can analyse the component plus residual plot for the independent variables.
+
+A CCPR (Component‑Component Plus Residual) plot is an enhanced version of the partial residual plot tailored for multiple regression. It overlays two series: the partial residuals (residuals plus the estimated effect of the predictor) and the fitted values of that predictor versus its values
+
+**Purpose & Use in Linearity Checks**
+
+-   **Evaluating linearity**: By plotting both the adjusted data points and the predictor’s fitted component, CCPR plots allow us to visually assess whether the relationship between a specific independent variable and the dependent variable remains approximately linear after accounting for other predictors.
+
+-   **Diagnosing model fit**: If the partial residuals scatter significantly deviates from the component line, it suggests possible non‑linearity or mis-specification in the model.
+
+```{r}
+library(car)
+model_1 <- lm(Dropout ~ ., data = df)
+model_1
+crPlots(model_1)
+```
+
+There seems to exist some non-linearity in few variables like: *Enroll* and *Toilet.* Although there are some non linearity in the beginning of *"Literacy_Rate_Female",* compared to "*Toilet"* and "*Enroll"* it is negligable*.*
+
+To tackle this non linearity we transforme these variables and fit the model. Based on the visual evidence from the CCPR plots, we would start by adding a*Standard power transformation* term for **`Toilet`** and a *logarithmic transformation* term for **`Enroll`**.
+
+```{r}
+library(car)
+model_2 <- lm(Dropout ~ I(log(Enroll)) + Crime_Rate + Sex_Ratio + Child_Marriage + NSDP + I(Toilet^2) + Literacy_Rate_Female, data = df)
+model_2
+crPlots(model_2)
+```
+
+The transformed model shows better results than the the previous case. We can say that the transformation have been successful in better linearizing this relationship.
+
+## 3. Checking for Heteroscedasticity
+
+To assess the validity of the constant variance assumption in the linear regression model, we proceed with a diagnostic evaluation of heteroscedasticity. This involves both graphical and statistical methods.
+
+We begin by visually inspecting the ***residuals versus fitted values plot*** to detect any apparent patterns in the spread of residuals. Subsequently, a formal statistical test—namely, the ***Breusch–Pagan test*** is employed to confirm the presence or absence of heteroscedasticity in the model.
+
+1.  **Residuals vs. Fitted Values Plot**
+    -   **Purpose**: This scatterplot of residuals against fitted values is used to visually assess whether the variance of residuals remains constant across all levels of predicted outcome.
+
+    -   **Interpretation**: A random, uniform spread indicates homoscedasticity. In contrast, a “fan” or cone shape—where residual spread increases or decreases with fitted values—signals heteroscedasticity.
+
+    -   **Role in diagnostics**: This plot is a quick graphical check that can reveal patterns or variance changes linked to model mis-specification or omitted variables.
+
+```{r}
+# Visual Test: Residuals vs Fitted
+library(ggplot2)
+
+ggplot(data = data.frame(fitted = fitted(model_2), residuals = residuals(model_2)), 
+       aes(x = fitted, y = residuals)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE, col = "red") +
+  theme_dark() +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals")
+
+```
+
+```{r}
+plot(model_2, which = 1)
+```
+
+Here the residuals-versus-fitted plot shows **no signs of heteroscedasticity** - i.e., the residuals appear randomly and uniformly scattered around zero without any discernible “funnel” or cone-shaped pattern - it suggests that the assumption of constant variance holds in the model.
+
+With this graphical confirmation of homoscedasticity, we proceed to the next stage of diagnostics: applying the Breusch–Pagan test to formally evaluate whether the variance of the residuals is independent of the predictors.
+
+2.  **Breusch–Pagan Test**
+
+    To formally assess the presence of heteroscedasticity and validate the graphical findings, we proceed with the Breusch–Pagan test. This statistical procedure offers a rigorous evaluation of whether the variance of the residuals is systematically related to the explanatory variables, thereby strengthening the robustness of our inference.
+
+    -   **Definition**: A formal statistical test developed by Breusch and Pagan (1979) to detect whether error variance depends on predictor variables.
+
+    -   **Mechanism**: It analyzes squared residuals via an auxiliary regression on fitted values or covariates. A chi-squared statistic is then derived to evaluate if variance is truly constant .
+
+    -   **Interpretation**: A low p-value (e.g., \< 0.05) warrants rejecting the null—the assumption of constant variance—thereby confirming heteroscedasticity.
+
+    -   **Importance**: Detecting heteroscedasticity is crucial because, although OLS estimates remain unbiased, their standard errors become unreliable, which undermines the validity of hypothesis tests and confidence interval.
+
+```{r}
+library(lmtest)
+bp_test <- bptest(model_2)
+print(bp_test)
+```
+
+Since the p-value (0.8111) is much greater than 0.05, we fail to reject the null hypothesis. This indicates that there is no significant evidence of heteroscedasticity in the residuals of the regression model. Therefore, we can conclude that the assumption of homoscedasticity holds for this model, meaning the variance of the error terms is constant across observations.
+
+## 4. Checking for Normality
+
+Following our assessment of homoscedasticity via residuals–fitted plots and the Breusch–Pagan test, we now turn our attention to evaluating the **normality** of residuals. While constant variance ensures reliable estimation of error dispersion, normality is essential for the validity of t-tests, F-tests, and confidence or prediction intervals in regression analysis.
+
+1.  **Quantile - Quantile (Q–Q) Plot**
+
+A **quantile–quantile (Q–Q) plot** compares the quantiles of the **standardized residuals** against those of a theoretical standard normal distribution. If the residuals are approximately normal, the plotted points will lie close to the 45° reference line. This visual tool is particularly sensitive to departures in the tails—where deviations indicate skewness or kurtosis differences.
+
+```{r}
+plot(model_2, which = 2)
+```
+
+**Successful outcome**: Residuals closely align with the diagonal, suggesting approximate normality and supporting the reliability of inferential statistics within the model.
+
+2.  **Formal Test of Normality: *Shapiro–Wilk Test***
+
+To supplement the graphical evidence from the Q–Q plot, we conduct the **Shapiro–Wilk test**, a widely recognized and statistically powerful method for assessing normality, particularly in small to moderate sample sizes.
+
+**Definition and Purpose:** The **Shapiro–Wilk test** introduced by Shapiro and Wilk (1965), is a highly powerful method for testing normality, particularly well-suited to small and moderate sample sizes.
+
+**Mechanism:** This test computes a statistic **W** by comparing the ordered sample esiduals to the expected order statistics under normality. A value of **W** close to 1 suggests strong adherence to normality, while lower values indicate deviation.
+
+[**Interpretation**]{.underline}:
+
+-   Null hypothesis: Residuals are normally distributed.
+
+-   A **non-significant p-value** (commonly ≥ 0.05) leads us to **fail to reject** null hypo​, supporting normality.
+
+-   A **significant result** (p \< 0.05) indicates violation of normality, prompting consideration of data transformation or alternative inferential methods
+
+```{r}
+shapiro.test(model_2$residuals)
+```
+
+The p-value of the test turns out to be "*0.4805"*. Since this value is not less than .05, we can assume the sample data comes from a population that is normally distributed.
+
+Here, the Shapiro–Wilk test yields a non-significant result, and the Q–Q plot shows strong alignment with the reference line, we can reasonably conclude that the residuals conform to the normality assumption. This affirms the statistical soundness of the model's inference procedures, including confidence intervals and significance tests.
+
+## 5. Leverages and Outliers
+
+1.  **Hat Matrix and Leverages**
+
+The **hat matrix**, $H=X (X^\top X)^{-1} X^\top$, is the projection matrix that maps observed responses $y$ to fitted values $\hat{y}​=Hy$, thus “putting the hat” on $y$. The **leverage** of the $i$ -th observation is given by the diagonal element $h_{ii}$​ of $H$:\
+
+$h_{ii} = x_i^\top (X^\top X)^{-1} x_i$​\
+
+It quantifies how far $x_i$ lies from the centroid of the predictor space and indicates the influence of $y_i$​ on its own fitted value. Properties include $1/n≤hii<1$​, $\sum_i h_{ii} = p$, and by convention values exceeding $2p/n$ are flagged as high leverage.
+
+Key properties include:
+
+-   $0 \le h_{ii} \le 1$
+
+-   $\sum_i h_{ii} =p$ (number of parameters)
+
+-   Observations with $h_{ii} > 2p/n\; (or\; 3p/n)$ are commonly flagged as **high leverage**
+
+2.  **Studentized Residuals and Outliers**
+
+A raw residual is defined as $e_i = y_i - \hat y_i$​. To standardize its scale, one uses the **studentized residual**, which divides $e_i$​ by its estimated standard deviation:\
+
+$t_i = \frac{e_i}{\hat\sigma \sqrt{1 - h_{ii}}},$​\
+
+thus adjusting for differing residual variances across observations. An enhanced form is the **externally studentized residual**, where the variance estimate excludes observation $i$:\
+
+$t_i^* = \frac{e_i}{\sqrt{\mathrm{MSE}_{(i)}\,(1 - h_{ii})}}$​​\
+
+making it more sensitive for flagging **outliers**. Common heuristics treat $|t_i|$ or $|t_i^*| > 2 \; (or\; 3)$ as indicative of potential outliers.
+
+3.  **Cook's Distance** $D_i$​
+
+Cook’s distance is a scalar measure of how much *all* fitted values change when the iii-th observation is removed from the regression. Formally:\
+$D_i = \frac{\sum_{j=1}^{n} (\widehat y_j - \widehat y_{j(i)})^2}{p\, \widehat\sigma^2}$​\
+where $\widehat y_{j(i)}$ denotes the fitted value when observation $i$ is omitted, $p$ is the model’s number of parameters, and $\widehat\sigma^2$ is the residual mean square.
+
+**Interpretation & Rules of Thumb**
+
+-   A large $D_i$​ signals an *influential* point—i.e., one whose deletion materially alters model predictions or parameter estimates.
+
+-   Common heuristics: flag observations with $D_i > 1$, or exceed $4/(n - p)$ ; values markedly larger than the rest also warrant attention.
+
+```{r}
+library(car)
+#influenceIndexPlot(model_2)
+influencePlot(model_2)
+```
+
+```{r}
+plot(model_2, which = 5)
+```
+
+The plot reveals that observation `10` is a significant concern due to its high standardized residual and very high influence on the model. Observations `20` and `26` also exhibit moderate to high influence.
+
+# Model Selection
+
+**Best subset selection** systematically examines *all possible* combinations of predictors to identify the optimal regression models of each size. If you have $p$ candidate variables, there are $2^p$ possible models. For each model size $k=1,2,\dots,p$ the best subset algorithm selects the model with the lowest residual sum of squares (RSS).
+
+This exhaustive approach elegantly balances completeness with precision: you obtain the very best model of each dimension.
+
+Once you've found the leading model for each $k$, you need to decide which $k$ represents the best trade-off between goodness‑of‑fit and model complexity. Standard model selection criteria are used:
+
+1.  **Adjusted** $R^2$
+
+**Formula** : $R_{adj}^2​=1− \frac{RSS/(n−k−1)}{TSS/(n−1)}$​
+
+**Use & Interpretation** : Unlike $R^2$, which always increases with more predictors, $R^2_{\text{adj}}$​ penalizes unnecessary model complexity. The preferred model maximizes $R^2_{\text{adj}}$​, striking a balance between fit and parsimony.
+
+2.  **Mallows’** $C_p$
+
+**Formula**: $Cp​=\frac{SSE_p}{σ^2}​​+\;2(p+1)−n$
+
+**Use & Interpretation**:$C_p$​ gauges the trade-off between bias and variance. Ideal models satisfy $C_p \approx p+1$ and feature low $C_p$​. Values significantly above signal high bias; those below may represent sampling anomalies.
+
+3.  **Bayesian Information Criterion (BIC)**
+
+**Formula:** $BIC=n\,ln(RSS/n​)+(k+1)\,ln(n)$
+
+**Use & Interpretation:** BIC incorporates a heavier complexity penalty than AIC when $n > 7$, favoring simpler, more parsimonious models. It aligns with Bayesian inference principles—and also approximates leave ‑ $k$ - out cross‑validation
+
+```{r}
+library(leaps)
+
+subset_models <- regsubsets(Dropout ~ I(log(Enroll)) + Crime_Rate + Sex_Ratio + Child_Marriage + NSDP + I(Toilet^2) + Literacy_Rate_Female, data = df)
+subset_summ <- summary(subset_models)
+```
+
+```{r}
+# Plot Adjusted R-squared, Mallows’s Cp, and BIC for model comparison
+par(mfrow = c(1, 3))  # Layout for 3 plots
+
+# Plot Adjusted R-squared
+plot(subset_summ$adjr2, type = "b", pch = 19, xlab = "Number of Predictors", ylab = "Adjusted R-squared")
+
+# Plot Ma
+plot(subset_summ$cp, type = "b", pch = 19, xlab = "Number of Predictors", ylab = "Mallows’s Cp")
+
+# Plot BIC
+plot(subset_summ$bic, type = "b", pch = 19, xlab = "Number of Predictors", ylab = "BIC")
+```
+
+Based on these plots, we should seriously consider and select the model with **3 predictors** due to its optimal performance according to Mallows's C and BIC, which are strong indicators of a good balance between fit and model complexity.
+
+```{r}
+subset_summ$outmat
+```
+
+The Mallows's C and BIC plots both suggested that the optimal model has 3 predictors. This table suggest that `Sex_Ratio`, `Child_Marriage`, and `I(Toilet^2)` are the three independent variable that corresponds to the lowest Mallows's C and BIC. So let us, model these three variables.
+
+```{r}
+model_3 <- lm(Dropout ~ Child_Marriage + Sex_Ratio + I(Toilet^2), data = df)
+summary(model_3)
+```
+
+# Influence Statistics
+
+1.  **Residual vs Leverage Plot**
+
+-   **Axes:**
+
+    -   X-axis: Leverage $h_{ii}$​
+
+    -   Y-axis: Standardized residuals
+
+-   **Purpose:** This plot is designed to identify observations that are potentially influential on the regression model. It simultaneously assesses the extent to which an observation has unusual predictor values (leverage) and how poorly the model predicts its response value (residual). Cook's distance contours are overlaid to indicate overall influence.
+
+```{r}
+library(car)
+plot(model_3, which = 5)
+```
+
+2.  **Cook's distance vs Leverage plot** \* $hii​ / (1−hii​)$
+
+-   **Axes:**
+
+    -   X-axis: Leverage $h_{ii}$​
+
+    -   Y-axis: Cook's distance
+
+-   **Purpose:** This plot specifically visualizes Cook's distance (a measure of overall influence) against leverage. The diagonal dashed lines illustrate contours of constant standardized residual, providing additional context for the source of influence.
+
+```{r}
+plot(model_3, which = 6)
+```
+
+#### Observations
+
+Both diagnostic plots consistently highlight **Observation 20** as the most influential point in the regression model `lm(Dropout ~ Child_Marriage + Sex_Ratio + I(Toilet^2))`, primarily due to its exceptionally high leverage. Observation `30` also demonstrates notable influence, stemming from a combination of moderate leverage and a relatively large positive standardized residual. Observation `2` is identified as an outlier in terms of its response value (large negative residual) but has relatively low influence due to its moderate leverage. These influential observations warrant further investigation to ensure they are not unduly distorting the model's coefficients and inferences.
+
+# Tests of Hypotheses
+
+## 1. Individual Test
+
+-   **Purpose**: Evaluate whether a single coefficient $\beta_j$​ differs from zero, given all other variables in the model.
+
+<!-- -->
+
+-   **Hypothesis**:\
+    $H_0: \beta_j = 0$
+
+    $H_A: \beta_j \neq 0$
+
+<!-- -->
+
+-   **Test statistic**:\
+    $t = \frac{\hat\beta_j}{\text{SE}(\hat\beta_j)}$​​
+
+Under $H_0$, this follows a *t- distribution* with $n - k - 1$ degrees of freedom.
+
+```{r}
+summary(model_3)
+```
+
+-   **`Child_Marriage`:**
+
+    -   **p-value = 0.000691** (\*\*\*): Strong evidence that Child_Marriage is positively associated with Dropout.
+
+-   **`Sex_Ratio`:**
+
+    -   **p-value = 0.04471** (\*): Evidence that higher Sex_Ratio is associated with higher Dropout.
+
+-   **`Toilet^2`:**
+
+    -   **p-value = 0.01487** (\*): Evidence that the squared Toilet variable is negatively associated with Dropout.
+
+-   **Intercept:**
+
+    -   Not statistically significant (p = 0.1709).
+
+In summary, all three predictor variables - `Child_Marriage`, `Sex_Ratio`, and `Toilet^2` demonstrate significant associations with dropout rates.
+
+## 2. Joint Significance Test
+
+-   **Purpose**: Test whether a set of coefficients (e.g., $\beta_{j_1}, \beta_{j_2}, ..., \beta_{j_m})$ are all zero simultaneously.
+
+<!-- -->
+
+-   **Hypothesis**:\
+    $H_0: \beta_{j_1} = \beta_{j_2} = \cdots = \beta_{j_m} = 0$
+
+    vs. $H_A: at\ least\ one ≠ 0$.
+
+<!-- -->
+
+-   **Test statistic** (using residual sum of squares):
+
+    $F = \frac{(SSR_r - SSR_u)/m}{SSR_u / (n - k - 1)}$​\
+    Where:
+
+    -   $SSR_r$​: residual sum in the restricted model (without those *m* variables).
+
+    -   $SSR_u$: residual sum in the full (unrestricted) model.
+
+```{r}
+summary(model_3)
+```
+
+Since the p-value is much less than 0.05, we **reject the null hypothesis**. This means:
+
+-   There is **strong evidence** that at least one of the predictor variables is significantly associated with the outcome.
+
+-   Our overall model is **statistically significant**.
+
+## 3. Model Comparison with Unrestricted Model using ANOVA
+
+To evaluate whether including additional predictors ( `I(log(Enroll))`, `Crime_Rate`, `NSDP` and `Female_Literacy_Rate`) improves the model’s explanatory power for dropout rates, we compared the unrestricted model to a restricted model using an ANOVA F-test.
+
+### Specifying Our Models
+
+-   **Unrestricted** **Model:** `Dropout ~ I(log(Enroll)) + Crime_Rate + Sex_Ratio + Child_Marriage + NSDP + I(Toilet^2) + Literacy_Rate_Female`
+
+-   **Restricted** **Model:** `Dropout ~ Child_Marriage + Sex_Ratio + I(Toilet^2)`
+
+```{r}
+anova(model_3, model_2)
+```
+
+The test yielded an F-statistic of 1.021 and a p-value of 0.4157. As the p-value is well above the conventional significance threshold of 0.05, we fail to reject the null hypothesis that the additional predictors jointly improve the model. Thus, the simpler restricted model is preferred, as the extra variables do not significantly enhance the explanation of dropout rates.
+
+# Checking for Multicollinearity
+
+## *Variance Inflation Factors (VIF)*
+
+The ***variance inflation factor*** estimates how much the variance of a regression coefficient estimate is inflated due to multicollinearity. It looks at the extent to which an explanatory variable can be explained by all the other explanatory variables in the equation.
+
+-   $VIF≥1$
+
+-   A high $VIF_j$ for an independent variable $X_j$ indicates a strong collinearity with other variables, suggesting the need for adjustments in the model’s structure and the selection of independent variables.
+
+-   $VIF_j>>10$ indicates *severe variance inflation* for the parameter estimator associated with $X_j$.
+
+```{r}
+vif(model_2)
+```
+
+## *Inverse Variance Inflation Factor (IVIF)*
+
+**IVIF** is simply the reciprocal of the VIF:
+
+-   $IVIF_j= \frac{1}{VIF_j}=1−R^2_j$
+
+It can be interpreted as the proportion of variance in a predictor that is *not* explained by the other predictors
+
+```{r}
+1/vif(model_2)
+```
+
+## *Condition Number*
+
+Let $X^∗$ be the matrix of scaled columns of the original design matrix $X$.
+
+If the eigenvalues of $\frac{1}{n−1}X^{∗′}X^∗$ is given by $λ_1,λ_2,...,λ_k$ then **condition number** of $X$ is given by
+
+$κ(X)=√(\frac{λ_{max}}{λ_{min}})$
+
+where $λ_{max}$ and $λ_{min}$ are the maximum and minimum eigenvalues of $\frac1{n−1}X^{∗′}X^∗$
+
+The closer the $λ_{min}$ to 0, the closer $X′X$ to being singular.
+
+Note that if there is ill-conditioning, some eigenvalues of $X′X$ are near zero, hence a possible high value of $κ$.
+
+-   Low Condition Number $κ$ (close to 1): predictors are nearly orthogonal, meaning they are not collinear.
+
+-   High Condition Number $κ$: High degree of multicollinearity
+
+```{r}
+library(multiColl)
+CN(model.matrix(model_2))
+```
+
+**Thresholds:**
+
+-   **CN \< 100** → no serious multicollinearity
+
+-   **100 ≤ CN ≤ 1000** → moderate to strong multicollinearity
+
+-   **CN \> 1000** → severe
+
+At **≈ 233**, our full model is firmly in the **moderate-to-strong** range—this suggests meaningful collinearity that can impact the stability and precision of coefficient estimates.
+
+## *Condition Indices*
+
+***Condition indices*** are the ratio of the square root of maximum eigenvalue to the square root of each of the other eigenvalues, that is,
+
+$CI_j=η_j=\frac{√λ_{max}}{√λ_j}$
+
+-   This gives a clarification as to whether one or several dependencies are present among the X ’s.
+
+-   This can help in formulating a possible simultaneous system of equations
+
+-   The lowest condition index is 1.
+
+-   The condition number is the highest condition index.
+
+```{r}
+library(klaR)
+cond.index(model_2, data = df)
+```
+
+# Final Model Interpretation
+
+We have finally come to the last stage of this project where we interpret our model. Our final model is -
+
+$$
+Dropout = \alpha \;+ \beta_1* Child\_Marriage \; + \beta_2* Sex\_Ratio \; + \beta_3* Toilet^2 \;+ \epsilon
+$$
+
+The values of $\alpha$, $\beta_1$, $\beta_2$ and $\beta_3$ are following:
+
+```{r}
+model_3
+```
+
+## Model Summary
+
+```{r}
+summary(model_3)
+```
+
+All the coefficients (except for the intercept term) are statistically significant at *5%* significance level.
+
+### Model Performance
+
+-   The final model demonstrated a good R-squared value of ***0.5509***, indicating that approximately ***55.09%*** of the variance in dropout rates is explained by the selected predictors.
+
+-   The Adjusted R-squared value of ***0.5045*** confirms the model's goodness-of-fit while accounting for the number of predictors.
+
+-   The overall model is statistically significant (***F*** = ***11.86***, ***p*** \< ***3.05e-05***), confirming that the predictors collectively provide a strong explanation of the variance in dropout.
+
+## Interpretation of Coefficients
+
+1.  $Child\_Marriage$
+
+A strong positive relationship was observed, suggesting that higher rates of child marriage significantly increase dropout rates. Each one‐percentage‐point increase in the state‐level child‐marriage rate is associated with an approximate *0.37*‐point rise in the female secondary‐school dropout rate, underscoring the critical interplay between early marriage practices and educational disengagement.
+
+2.  $Sex\_Ratio$
+
+A positive coefficient indicates that higher sex ratios (favorable to females) correlate with increased dropout rates. A higher female‐to‐male sex ratio—often a proxy for broader gender norms—correlates with increased dropout rates in our sample. This counterintuitive finding suggests that in states where gender parity in population is more balanced, other socio‐cultural pressures (e.g., dowry expectations or safety concerns) may still impede girls’ continued schooling, warranting further investigation into social and cultural dynamics.
+
+3.  $Toilet^2$
+
+The negative coefficient on the squared term for toilet availability implies diminishing—but still meaningful—returns: states that invest more heavily in sanitation infrastructure see proportionally larger reductions in female dropout, particularly when baseline facility levels are low.
+
+## Policy Implications
+
+-   **Accelerate Child‐Marriage Prevention:** Given the strong linkage between early marriage and dropout, states must bolster enforcement of existing marriage‐age laws, coupled with community‐level awareness campaigns and incentives (e.g., conditional cash transfers) to keep girls in school.
+
+-   **Reexamine Gender‐Norm Interventions:** The positive association with sex ratio indicates that numerical parity alone does not guarantee female empowerment. Programmes should integrate gender‐sensitization curricula and safe‐transport initiatives to address the underlying social barriers affecting girls.
+
+-   **Targeted Infrastructure Upgrades:** While basic sanitation improvements yield large first‐order benefits, incremental investments still matter. Prioritizing schools in under‐served districts for toilet construction and maintenance can produce outsized gains in female retention.
+
+# Conclusion
+
+By systematically comparing alternative model specifications and isolating three key determinants - child marriage prevalence, sex‐ratio dynamics, and sanitation infrastructure - this analysis provides a transparent, state‐level roadmap for action. The econometric results highlight that while investments in physical infrastructure are essential, they must be paired with robust social policies to address the root causes of educational disengagement among girls. In doing so, policymakers can not only improve enrollment statistics but also contribute to broader gender‐equality and development objectives, ensuring that every girl in India has the opportunity to complete her secondary education.

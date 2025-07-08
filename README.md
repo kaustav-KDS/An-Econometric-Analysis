@@ -4,7 +4,7 @@ Despite notable strides in elementary education, the dropout rate among secondar
 
 This study therefore addresses the following core question:
 
-<em>“What socio‐demographic and infrastructural factors most strongly predict secondary‐school dropout rates among girls across Indian states?”</p>
+<em>“What socio‐demographic and infrastructural factors most strongly predict secondary‐school dropout rates among girls across Indian states?”</em>
 
 
 By employing a panel of state‐level indicators - this paper seeks to quantify the relative importance of each determinant and thus inform targeted, evidence‐based policy responses.

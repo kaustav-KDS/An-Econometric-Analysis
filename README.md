@@ -8,3 +8,6 @@ This study therefore addresses the following core question:
 
 
 By employing a panel of state‐level indicators - this paper seeks to quantify the relative importance of each determinant and thus inform targeted, evidence‐based policy responses.
+
+
+use this link to see preview: https://htmlpreview.github.io/?https://github.com/kaustav-KDS/An-Econometric-Analysis/blob/main/An%20Econometric%20Analysis.html
